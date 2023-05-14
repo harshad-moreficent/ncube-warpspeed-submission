@@ -120,7 +120,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
             transcript = get_audio_transcript(bot, chat_id,
                                               message.voice.file_id)
             if transcript is None:
-                log.error('{chat_id} - Failed to get audio transcript')
+                log.error(f'{chat_id} - Failed to get audio transcript')
                 sent_message = bot.send_message(
                     chat_id,
                     'Something went wrong. Please retry.',
