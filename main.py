@@ -13,9 +13,10 @@ import subprocess
 import tempfile
 from tenacity import retry, stop_after_delay, stop_after_attempt
 from typing import Dict, Optional
-
-from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL, ENV_OPENAI_API_KEY, ENV_ELEVEN_LABS_API_KEY
+from dotenv import load_dotenv
 from model import Character, ChatData
+from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL, ENV_OPENAI_API_KEY, ENV_ELEVEN_LABS_API_KEY
+load_dotenv()
 
 log = logging.getLogger(Path(__file__).stem)
 
@@ -26,7 +27,7 @@ BOT_NAME = 'Baatein.ai'
 def transcribe_audio(chat_id: int,
                      audio_file: BufferedReader) -> Optional[str]:
     try:
-        transcript = openai.Audio.transcribe("whisper-1", audio_file)['text']
+        transcript = openai.Audio.transcribe("whisper-1", audio_file)
         return transcript['text']
     except (openai.error.APIError, openai.error.AuthenticationError,
             open.error.RateLimitError,
@@ -50,9 +51,10 @@ def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
     transcript = None
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        oga_file_name = os.path.join(temp_dir, 'input.oga')
+        print(temp_dir)
+        oga_file_name = os.path.join(temp_dir,'input.oga')
         # ogg_file_name = os.path.join(temp_dir, "tmp.ogg")
-        mp3_file_name = os.path.join(temp_dir, 'output.mp3')
+        mp3_file_name = os.path.join(temp_dir,'output.mp3')
 
         with open(oga_file_name, "+wb") as oga_file:
             oga_file.write(content)
@@ -60,7 +62,7 @@ def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
         # subprocess.run(["ffmpeg", "-i", oga_file_name, "-vn", ogg_file_name])
 
         subprocess.run([
-            "ffmpeg", "-i", oga_file_name, "-vn", "-ar", "44100", "-ac", "2",
+            "ffmpeg", "-i", oga_file_name, "-ar", "44100", "-ac", "2",
             "-q:a", "1", "-codec:a", "libmp3lame", mp3_file_name
             # "ffmpeg", "-i", oga_file_name, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", mp3_file_name
         ])
@@ -132,9 +134,12 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                     'Something went wrong. Please retry.',
                     reply_to_message_id=message_id)
             else:
-                sent_message = bot.send_message(chat_id,
-                                                transcript,
-                                                reply_to_message_id=message.id)
+                reply = chat_data.get_text_response(transcript)
+                reply_text, reply_audio = reply
+                sent_message = bot.send_voice(chat_id,
+                                              reply_audio,
+                                              reply_to_message_id=message_id,
+                                              caption=reply_text)
         else:
             log.error(
                 f'{chat_id} - Got unhandled content type: {content_type}')
@@ -206,6 +211,7 @@ def main():
     log.info('Beginning BotHandlers')
 
     bot_token = os.getenv(ENV_BOT_TOKEN)
+    print(bot_token)
     if bot_token is None:
         log.error(f'{ENV_BOT_TOKEN} not set')
         return
