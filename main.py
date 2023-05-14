@@ -60,9 +60,6 @@ def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
 
         subprocess.run([
                 "ffmpeg", "-y", "-i", ogg_file_name,"-vn", "-ar", "16000", "-ac", "1", mp3_file,
-
-            # "ffmpeg", "-hide_banner", "-i",
-            # ogg_file_name, "-acodec", "pcm_s16le", mp3_file
         ])
 
         with open(mp3_file, "rb") as mp3_file:
@@ -114,7 +111,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                                          'Something went wrong. Please retry',
                                          reply_to_message_id=message_id)
             else:
-                sent_message = bot.send_voice(chat_id,
+                sent_message = bot.send_message(chat_id,
                                                 reply,
                                                 reply_to_message_id=message_id)
 

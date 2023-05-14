@@ -69,8 +69,8 @@ class ChatData:
                 "role": "assistant",
                 "content": response
             })
-            audio = self.tts(response)
-            return audio
+            # audio = self.tts(response)
+            return response
         except (openai.error.APIError, openai.error.AuthenticationError,
                 open.error.RateLimitError,
                 openai.error.ServiceUnavailableError) as e:
