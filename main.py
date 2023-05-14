@@ -108,7 +108,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
         sent_message = None
 
         if content_type == 'text':
-            if message.text == '/reset':
+            if message.text in ['/reset','reset','/start','start']:
                 start_handler(message)
             else:
                 log.info(f'{chat_id} - Got text input')
