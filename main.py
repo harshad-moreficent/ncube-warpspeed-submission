@@ -108,20 +108,26 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
         sent_message = None
 
         if content_type == 'text':
-            log.info(f'{chat_id} - Got text input')
-            reply = chat_data.get_text_response(message.text)
-
-            sent_message = None
-            if reply is None:
-                reply = bot.send_message(chat_id,
-                                         'Something went wrong. Please retry',
-                                         reply_to_message_id=message_id)
+            if message.text == '/reset':
+                start_handler(message)
             else:
-                reply_text, reply_audio = reply
-                sent_message = bot.send_voice(chat_id,
-                                              reply_audio,
-                                              reply_to_message_id=message_id,
-                                              caption=reply_text)
+                log.info(f'{chat_id} - Got text input')
+                reply = chat_data.get_text_response(message.text)
+
+                sent_message = None
+                if reply is None:
+                    reply = bot.send_message(chat_id,
+                                             'Something went wrong. Please retry',
+                                             reply_to_message_id=message_id)
+                else:
+                    reply_text, reply_audio = reply
+                    sent_message = bot.send_photo(chat_id
+                                    , photo=open(f'character_portraints/{chat_data.character_name}.jpeg', 'rb')
+                                    ,reply_to_message_id=message_id)
+                    sent_message = bot.send_voice(chat_id,
+                                                  reply_audio,
+                                                  reply_to_message_id=message_id,
+                                                  caption=reply_text)
 
         elif content_type == 'voice':
             log.info(f'{chat_id} - got voice input')
@@ -136,6 +142,9 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
             else:
                 reply = chat_data.get_text_response(transcript)
                 reply_text, reply_audio = reply
+                sent_message = bot.send_photo(chat_id
+                                , photo=open(f'character_portraints/{chat_data.character_name}.jpeg', 'rb')
+                                ,reply_to_message_id=message_id)
                 sent_message = bot.send_voice(chat_id,
                                               reply_audio,
                                               reply_to_message_id=message_id,
