@@ -27,7 +27,6 @@ class ChatMessage:
 class ChatData:
     __chat_id: int
     __character_name: str
-    __system_prompt: str
     __chat_model: str
     __voice: str
     __tts_model: str
