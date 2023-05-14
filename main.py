@@ -115,9 +115,11 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                                          'Something went wrong. Please retry',
                                          reply_to_message_id=message_id)
             else:
+                reply_text, reply_audio = reply
                 sent_message = bot.send_voice(chat_id,
-                                              reply,
-                                              reply_to_message_id=message_id)
+                                              reply_audio,
+                                              reply_to_message_id=message_id,
+                                              caption=reply_text)
 
         elif content_type == 'voice':
             log.info(f'{chat_id} - got voice input')
