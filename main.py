@@ -1,3 +1,6 @@
+import elevenlabs
+import fleep
+from io import BufferedReader
 import logging
 import openai
 from pathlib import Path
@@ -8,7 +11,8 @@ import os
 import requests
 import subprocess
 import tempfile
-from typing import Dict
+from tenacity import retry, stop_after_delay, stop_after_attempt
+from typing import Dict, Optional
 
 from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL, ENV_OPENAI_API_KEY, ENV_ELEVEN_LABS_API_KEY
 from model import Character, ChatData
@@ -18,7 +22,20 @@ log = logging.getLogger(Path(__file__).stem)
 BOT_NAME = 'CelebVox'
 
 
-def get_audio(bot: telebot.TeleBot, chat_id: str, file_id: str):
+@retry(stop=(stop_after_delay(10) | stop_after_attempt(20)))
+def transcribe_audio(chat_id: int,
+                     audio_file: BufferedReader) -> Optional[str]:
+    try:
+        transcript = openai.Audio.transcribe("whisper-1", audio_file)['text']
+        return transcript['text']
+    except (openai.error.APIError, openai.error.AuthenticationError,
+            open.error.RateLimitError,
+            openai.error.ServiceUnavailableError) as e:
+        log.error(f'{chat_id}: failed to transcribe: {e}')
+        return None
+
+
+def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
     file_info = bot.get_file(file_id)
     if file_info is None:
         log.error(f'{chat_id}: Failed to get audio file info')
@@ -29,29 +46,33 @@ def get_audio(bot: telebot.TeleBot, chat_id: str, file_id: str):
         log.error(f'{chat_id} - Failed to get resp')
 
     content = resp.content
-    transc_content = None
+    transcript = None
 
     with tempfile.TemporaryDirectory() as temp_dir:
         oga_file_name = os.path.join(temp_dir, 'input.oga')
-        mp3_file_name = os.path.join(temp_dir, 'output.mp3')
+        ogg_file_name = os.path.join(temp_dir, "tmp.ogg")
+        mp3_file = os.path.join(temp_dir, 'output.mp3')
 
         with open(oga_file_name, "+wb") as oga_file:
             oga_file.write(content)
-
-        subprocess.run(
-            ["ffmpeg", "-hide_banner", "-i", oga_file_name, mp3_file_name])
         
-        with open(mp3_file_name, "br") as mp3_file:
-            transc_content = mp3_file.read()
+        subprocess.run(["ffmpeg", "-i", oga_file_name, "-c:a", "copy", ogg_file_name])
 
-    # with tempfile.NamedTemporaryFile(
-    #         mode="w+b",
-    #         suffix='.oga') as oga_file, tempfile.NamedTemporaryFile(
-    #             mode="w+b", suffix='.mp3') as mp3_file:
-    #     print(oga_file.name)
-    #     print(mp3_file.name)
+        subprocess.run([
+                "ffmpeg", "-y", "-i", ogg_file_name,"-vn", "-ar", "16000", "-ac", "1", mp3_file,
 
-    return transc_content
+            # "ffmpeg", "-hide_banner", "-i",
+            # ogg_file_name, "-acodec", "pcm_s16le", mp3_file
+        ])
+
+        with open(mp3_file, "rb") as mp3_file:
+            # info = fleep.get(mp3_file.read(128))
+            # print(info.type)  # prints ['raster-image']
+            # print(info.extension)  # prints ['png']
+            # print(info.mime)  # prints ['image/png']
+            transcript = transcribe_audio(chat_id, mp3_file)
+
+    return transcript
 
 
 def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
@@ -93,23 +114,24 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                                          'Something went wrong. Please retry',
                                          reply_to_message_id=message_id)
             else:
-                sent_message = bot.send_message(chat_id,
+                sent_message = bot.send_voice(chat_id,
                                                 reply,
                                                 reply_to_message_id=message_id)
 
         elif content_type == 'voice':
             log.info(f'{chat_id} - got voice input')
-            audio_data = get_audio(bot, chat_id, message.voice.file_id)
-            if audio_data is None:
-                log.error('{chat_id} - Failed to get audio file')
+            transcript = get_audio_transcript(bot, chat_id,
+                                              message.voice.file_id)
+            if transcript is None:
+                log.error('{chat_id} - Failed to get audio transcript')
                 sent_message = bot.send_message(
                     chat_id,
                     'Something went wrong. Please retry.',
                     reply_to_message_id=message_id)
             else:
-                sent_message = bot.send_voice(chat_id,
-                                              audio_data,
-                                              reply_to_message_id=message.id)
+                sent_message = bot.send_message(chat_id,
+                                                transcript,
+                                                reply_to_message_id=message.id)
         else:
             log.error(
                 f'{chat_id} - Got unhandled content type: {content_type}')
@@ -123,7 +145,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
     def chat_init_handler(message: Message):
         character_name = message.text
         if character_name not in characters.keys():
-            log.warn(f'Got unhandled character: {character_name}')
+            log.warning(f'Got unhandled character: {character_name}')
             sent_message = bot.reply_to(
                 message,
                 f'Sorry, that character is not available. Please choose one of:\n\n{character_names_md}',
@@ -186,6 +208,7 @@ def main():
     if eleven_labs_api_key is None:
         log.error(f'{ENV_ELEVEN_LABS_API_KEY} not set')
         return
+    elevenlabs.set_api_key(eleven_labs_api_key)
 
     characters = None
     try:

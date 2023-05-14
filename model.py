@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import elevenlabs
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 import logging
 from pathlib import Path
@@ -47,9 +48,18 @@ class ChatData:
     @property
     def character_name(self) -> str:
         return self.__character_name
+    
+    @retry(stop=(stop_after_delay(10) | stop_after_attempt(20)))
+    def tts(self, text: str):
+        audio = elevenlabs.generate(
+		  text=text,
+		  voice=self.__voice,
+		  model=self.__tts_model
+		)
+        return audio
 
     @retry(stop=(stop_after_delay(10) | stop_after_attempt(20)))
-    def get_text_response(self, text: str) -> Optional[str]:
+    def get_text_response(self, text: str):
         try:
             self.__chat_history.append({"role": "user", "content": text})
             response = openai.ChatCompletion.create(
@@ -59,7 +69,8 @@ class ChatData:
                 "role": "assistant",
                 "content": response
             })
-            return response
+            audio = self.tts(response)
+            return audio
         except (openai.error.APIError, openai.error.AuthenticationError,
                 open.error.RateLimitError,
                 openai.error.ServiceUnavailableError) as e:
