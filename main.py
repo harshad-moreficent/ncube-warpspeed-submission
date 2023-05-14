@@ -16,6 +16,7 @@ from typing import Dict, Optional
 from dotenv import load_dotenv
 from model import Character, ChatData
 from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL, ENV_OPENAI_API_KEY, ENV_ELEVEN_LABS_API_KEY
+
 load_dotenv()
 
 log = logging.getLogger(Path(__file__).stem)
@@ -52,9 +53,9 @@ def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
 
     with tempfile.TemporaryDirectory() as temp_dir:
         print(temp_dir)
-        oga_file_name = os.path.join(temp_dir,'input.oga')
+        oga_file_name = os.path.join(temp_dir, 'input.oga')
         # ogg_file_name = os.path.join(temp_dir, "tmp.ogg")
-        mp3_file_name = os.path.join(temp_dir,'output.mp3')
+        mp3_file_name = os.path.join(temp_dir, 'output.mp3')
 
         with open(oga_file_name, "+wb") as oga_file:
             oga_file.write(content)
@@ -62,17 +63,12 @@ def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
         # subprocess.run(["ffmpeg", "-i", oga_file_name, "-vn", ogg_file_name])
 
         subprocess.run([
-            "ffmpeg", "-i", oga_file_name, "-ar", "44100", "-ac", "2",
-            "-q:a", "1", "-codec:a", "libmp3lame", mp3_file_name
+            "ffmpeg", "-i", oga_file_name, "-ar", "44100", "-ac", "2", "-q:a",
+            "1", "-codec:a", "libmp3lame", mp3_file_name
             # "ffmpeg", "-i", oga_file_name, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", mp3_file_name
         ])
 
         with open(mp3_file_name, "rb") as mp3_file:
-            # print(f'xxxxxx {mp3_file.name}')
-            # info = fleep.get(mp3_file.read(128))
-            # print(info.type)  # prints ['raster-image']
-            # print(info.extension)  # prints ['png']
-            # print(info.mime)  # prints ['image/png']
             transcript = transcribe_audio(chat_id, mp3_file)
 
     return transcript
@@ -88,7 +84,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
     ]
     log.info(f'Available characters: {character_names}')
     character_names_md = '\n'.join(
-        [f'{idx + 1}. **{x}**' for idx, x in enumerate(character_names)])
+        [f'{idx + 1}. /{x}' for idx, x in enumerate(character_names)])
 
     state: Dict[int, ChatData] = {}
 
@@ -108,7 +104,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
         sent_message = None
 
         if content_type == 'text':
-            if message.text in ['/reset','reset','/start','start']:
+            if message.text in ['/reset', 'reset', '/start', 'start']:
                 start_handler(message)
             else:
                 log.info(f'{chat_id} - Got text input')
@@ -116,14 +112,18 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
 
                 sent_message = None
                 if reply is None:
-                    reply = bot.send_message(chat_id,
-                                             'Something went wrong. Please retry',
-                                             reply_to_message_id=message_id)
+                    reply = bot.send_message(
+                        chat_id,
+                        'Something went wrong. Please retry',
+                        reply_to_message_id=message_id)
                 else:
                     reply_text, reply_audio = reply
-                    sent_message = bot.send_photo(chat_id
-                                    , photo=open(f'character_portraints/{chat_data.character_name}.jpeg', 'rb')
-                                    ,reply_to_message_id=message_id)
+                    sent_message = bot.send_photo(
+                        chat_id,
+                        photo=open(
+                            f'character_portraints/{chat_data.character_name}.jpeg',
+                            'rb'),
+                        reply_to_message_id=message_id)
                     sent_message = bot.send_voice(chat_id,
                                                   reply_audio,
                                                   caption=reply_text)
@@ -141,9 +141,12 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
             else:
                 reply = chat_data.get_text_response(transcript)
                 reply_text, reply_audio = reply
-                sent_message = bot.send_photo(chat_id
-                                , photo=open(f'character_portraints/{chat_data.character_name}.jpeg', 'rb')
-                                ,reply_to_message_id=message_id)
+                sent_message = bot.send_photo(
+                    chat_id,
+                    photo=open(
+                        f'character_portraints/{chat_data.character_name}.jpeg',
+                        'rb'),
+                    reply_to_message_id=message_id)
                 sent_message = bot.send_voice(chat_id,
                                               reply_audio,
                                               caption=reply_text)
@@ -158,13 +161,12 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
         bot.register_next_step_handler(sent_message, handle_message)
 
     def chat_init_handler(message: Message):
-        character_name = message.text
+        character_name = message.text[1:]
         if character_name not in characters.keys():
             log.warning(f'Got unhandled character: {character_name}')
             sent_message = bot.reply_to(
                 message,
-                f'Sorry, that character is not available. Please choose one of:\n\n{character_names_md}',
-                parse_mode="Markdown")
+                f'Sorry, that character is not available. Please choose one of:\n\n{character_names_md}')
             bot.register_next_step_handler(sent_message, chat_init_handler)
         else:
             chat_id = message.chat.id
@@ -188,8 +190,8 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
         log.info('New Conversation')
         sent_message = bot.reply_to(
             message,
-            f'Hi, welcome to {BOT_NAME}. Please choose the celebrity you wish to chat with:\n\n{character_names_md}',
-            parse_mode="Markdown")
+            f'Hi, welcome to {BOT_NAME}. Please choose the celebrity you wish to chat with:\n\n{character_names_md}'
+        )
         bot.register_next_step_handler(sent_message, chat_init_handler)
 
     @bot.message_handler(commands=["reset"])
