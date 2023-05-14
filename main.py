@@ -8,7 +8,7 @@ import requests
 from typing import Dict
 import urllib
 
-from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL
+from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL, ENV_OPENAI_API_KEY, ENV_ELEVEN_LABS_API_KEY
 from model import Character
 
 log = logging.getLogger(Path(__file__).stem)
@@ -116,6 +116,17 @@ def main():
     bot_token = os.getenv(ENV_BOT_TOKEN)
     if bot_token is None:
         log.error(f'{ENV_BOT_TOKEN} not set')
+        return
+
+    openai_api_key = os.getenv(ENV_OPENAI_API_KEY)
+    if openai_api_key is None:
+        log.error(f'{ENV_OPENAI_API_KEY} not set')
+        return
+    
+    eleven_labs_api_key = os.getenv(ENV_ELEVEN_LABS_API_KEY)
+    if eleven_labs_api_key is None:
+        log.error(f'{ENV_ELEVEN_LABS_API_KEY} not set')
+        return
 
     characters = None
     try:
