@@ -160,7 +160,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                                  character=characters[character_name])
             state.update({chat_id: chat_data})
             sent_message = bot.send_message(
-                chat_id, f'Done. You are now chatting with {character_name}')
+                chat_id, f'Done. You are now chatting with {character_name}. To reset, enter /reset')
             bot.register_next_step_handler(sent_message, handle_message)
 
     @bot.message_handler(commands=["start"])
@@ -170,6 +170,13 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
             message,
             f'Hi, welcome to {BOT_NAME}. Please choose the celebrity you wish to chat with:\n\n{character_names_md}',
             parse_mode="Markdown")
+        bot.register_next_step_handler(sent_message, chat_init_handler)
+
+    @bot.message_handler(commands=["reset"])
+    def reset_handler(message: Message):
+        chat_id = message.chat.id
+        del state[chat_id]
+        sent_message = bot.reply_to(message, 'Done')
         bot.register_next_step_handler(sent_message, chat_init_handler)
 
     log.info('Beginning bot polling')
