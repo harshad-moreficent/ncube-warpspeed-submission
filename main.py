@@ -56,14 +56,17 @@ def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
 
         with open(oga_file_name, "+wb") as oga_file:
             oga_file.write(content)
-        
+
         # subprocess.run(["ffmpeg", "-i", oga_file_name, "-vn", ogg_file_name])
 
         subprocess.run([
-                "ffmpeg", "-y", "-i", oga_file_name, "-vn", mp3_file_name,
+            "ffmpeg", "-i", oga_file_name, "-vn", "-ar", "44100", "-ac", "2",
+            "-q:a", "1", "-codec:a", "libmp3lame", mp3_file_name
+            # "ffmpeg", "-i", oga_file_name, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", mp3_file_name
         ])
 
         with open(mp3_file_name, "rb") as mp3_file:
+            # print(f'xxxxxx {mp3_file.name}')
             # info = fleep.get(mp3_file.read(128))
             # print(info.type)  # prints ['raster-image']
             # print(info.extension)  # prints ['png']
@@ -113,8 +116,8 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                                          reply_to_message_id=message_id)
             else:
                 sent_message = bot.send_voice(chat_id,
-                                                reply,
-                                                reply_to_message_id=message_id)
+                                              reply,
+                                              reply_to_message_id=message_id)
 
         elif content_type == 'voice':
             log.info(f'{chat_id} - got voice input')
@@ -161,7 +164,9 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                                  character=characters[character_name])
             state.update({chat_id: chat_data})
             sent_message = bot.send_message(
-                chat_id, f'Done. You are now chatting with {character_name}. To reset, enter reset')
+                chat_id,
+                f'Done. You are now chatting with {character_name}. To reset, enter reset'
+            )
             bot.register_next_step_handler(sent_message, handle_message)
 
     @bot.message_handler(commands=["start"])

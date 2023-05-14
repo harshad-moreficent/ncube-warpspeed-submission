@@ -48,14 +48,12 @@ class ChatData:
     @property
     def character_name(self) -> str:
         return self.__character_name
-    
+
     @retry(stop=(stop_after_delay(10) | stop_after_attempt(20)))
     def tts(self, text: str):
-        audio = elevenlabs.generate(
-		  text=text,
-		  voice=self.__voice,
-		  model=self.__tts_model
-		)
+        audio = elevenlabs.generate(text=text,
+                                    voice=self.__voice,
+                                    model=self.__tts_model)
         return audio
 
     @retry(stop=(stop_after_delay(10) | stop_after_attempt(20)))
