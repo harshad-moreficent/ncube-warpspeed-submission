@@ -126,8 +126,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                             'rb'),
                         reply_to_message_id=message_id)
                     sent_message = bot.send_voice(chat_id,
-                                                  reply_audio,
-                                                  caption=reply_text)
+                                                  reply_audio)
 
         elif content_type == 'voice':
             log.info(f'{chat_id} - got voice input')
@@ -149,8 +148,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                         'rb'),
                     reply_to_message_id=message_id)
                 sent_message = bot.send_voice(chat_id,
-                                              reply_audio,
-                                              caption=reply_text)
+                                              reply_audio)
         else:
             log.error(
                 f'{chat_id} - Got unhandled content type: {content_type}')
