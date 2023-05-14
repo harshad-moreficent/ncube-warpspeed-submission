@@ -50,24 +50,24 @@ def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
 
     with tempfile.TemporaryDirectory() as temp_dir:
         oga_file_name = os.path.join(temp_dir, 'input.oga')
-        ogg_file_name = os.path.join(temp_dir, "tmp.ogg")
-        mp3_file = os.path.join(temp_dir, 'output.mp3')
+        # ogg_file_name = os.path.join(temp_dir, "tmp.ogg")
+        mp4_file_name = os.path.join(temp_dir, 'output.mp4')
 
         with open(oga_file_name, "+wb") as oga_file:
             oga_file.write(content)
         
-        subprocess.run(["ffmpeg", "-i", oga_file_name, "-c:a", "copy", ogg_file_name])
+        # subprocess.run(["ffmpeg", "-i", oga_file_name, "-vn", ogg_file_name])
 
         subprocess.run([
-                "ffmpeg", "-y", "-i", ogg_file_name,"-vn", "-ar", "16000", "-ac", "1", mp3_file,
+                "ffmpeg", "-y", "-i", oga_file_name, "-vn", mp4_file_name,
         ])
 
-        with open(mp3_file, "rb") as mp3_file:
-            # info = fleep.get(mp3_file.read(128))
-            # print(info.type)  # prints ['raster-image']
-            # print(info.extension)  # prints ['png']
-            # print(info.mime)  # prints ['image/png']
-            transcript = transcribe_audio(chat_id, mp3_file)
+        with open(mp4_file_name, "rb") as mp4_file:
+            info = fleep.get(mp4_file.read(128))
+            print(info.type)  # prints ['raster-image']
+            print(info.extension)  # prints ['png']
+            print(info.mime)  # prints ['image/png']
+            # transcript = transcribe_audio(chat_id, mp4_file)
 
     return transcript
 
@@ -111,7 +111,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                                          'Something went wrong. Please retry',
                                          reply_to_message_id=message_id)
             else:
-                sent_message = bot.send_message(chat_id,
+                sent_message = bot.send_voice(chat_id,
                                                 reply,
                                                 reply_to_message_id=message_id)
 
