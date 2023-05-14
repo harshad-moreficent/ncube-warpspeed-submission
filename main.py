@@ -1,12 +1,11 @@
-import json
 import logging
+import openai
 from pathlib import Path
 import pydantic
 import telebot
 from telebot.types import Message, BotCommand
 import requests
 from typing import Dict
-import urllib
 
 from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL, ENV_OPENAI_API_KEY, ENV_ELEVEN_LABS_API_KEY
 from model import Character, ChatData
@@ -29,7 +28,8 @@ def get_audio(bot: telebot.TeleBot, chat_id: str, file_id: str):
     return resp.content
 
 
-def run_bot(token: str, characters: Dict[str, Character]):
+def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
+            characters: Dict[str, Character]):
     bot = telebot.TeleBot(token)
     character_names = [
         x[0]
@@ -53,27 +53,46 @@ def run_bot(token: str, characters: Dict[str, Character]):
             return
 
         content_type = message.content_type
+        message_id = message.message_id
+
         sent_message = None
+
         if content_type == 'text':
             log.info(f'{chat_id} - Got text input')
-            sent_message = bot.send_message(chat_id, message.text)
+            reply = chat_data.get_text_response(message.text)
+
+            sent_message = None
+            if reply is None:
+                reply = bot.send_message(chat_id,
+                                         'Something went wrong. Please retry',
+                                         reply_to_message_id=message_id)
+            else:
+                sent_message = bot.send_message(chat_id,
+                                                reply,
+                                                reply_to_message_id=message_id)
+
         elif content_type == 'voice':
             log.info(f'{chat_id} - got voice input')
             audio_data = get_audio(bot, chat_id, message.voice.file_id)
             if audio_data is None:
                 log.error('{chat_id} - Failed to get audio file')
                 sent_message = bot.send_message(
-                    chat_id, 'Something went wrong. Please retry.')
+                    chat_id,
+                    'Something went wrong. Please retry.',
+                    reply_to_message_id=message_id)
             else:
-                sent_message = bot.send_audio(chat_id,
-                                              audio_data,
-                                              reply_to_message_id=message.id,
-                                              performer=chat_data.character_name)
+                sent_message = bot.send_audio(
+                    chat_id,
+                    audio_data,
+                    reply_to_message_id=message.id,
+                    performer=chat_data.character_name)
         else:
             log.error(
                 f'{chat_id} - Got unhandled content type: {content_type}')
             sent_message = bot.send_message(
-                chat_id, "Your reply must be either text or a voice note")
+                chat_id,
+                "Your reply must be either text or a voice note",
+                reply_to_message_id=message_id)
 
         bot.register_next_step_handler(sent_message, handle_message)
 
@@ -93,7 +112,10 @@ def run_bot(token: str, characters: Dict[str, Character]):
             )
             bot.send_message(chat_id, "Setting things up...")
             # set up chat llm and other APIs
-            state.update({chat_id: ChatData(character_name=character_name)})
+            chat_data = ChatData(chat_id=chat_id,
+                                 character_name=character_name,
+                                 character=characters[character_name])
+            state.update({chat_id: chat_data})
             sent_message = bot.send_message(
                 chat_id, f'Done. You are now chatting with {character_name}')
             bot.register_next_step_handler(sent_message, handle_message)
@@ -136,6 +158,7 @@ def main():
     if openai_api_key is None:
         log.error(f'{ENV_OPENAI_API_KEY} not set')
         return
+    openai.api_key = openai_api_key
 
     eleven_labs_api_key = os.getenv(ENV_ELEVEN_LABS_API_KEY)
     if eleven_labs_api_key is None:
@@ -150,7 +173,7 @@ def main():
         log.error(f'Failed to parse characters.json: {e.errors()}')
         return
 
-    run_bot(bot_token, characters)
+    run_bot(bot_token, openai_api_key, eleven_labs_api_key, characters)
 
 
 if __name__ == '__main__':
