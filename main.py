@@ -81,11 +81,9 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
                     'Something went wrong. Please retry.',
                     reply_to_message_id=message_id)
             else:
-                sent_message = bot.send_audio(
-                    chat_id,
-                    audio_data,
-                    reply_to_message_id=message.id,
-                    performer=chat_data.character_name)
+                sent_message = bot.send_voice(chat_id,
+                                              audio_data,
+                                              reply_to_message_id=message.id)
         else:
             log.error(
                 f'{chat_id} - Got unhandled content type: {content_type}')
