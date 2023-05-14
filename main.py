@@ -181,7 +181,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
             state.update({chat_id: chat_data})
             sent_message = bot.send_message(
                 chat_id,
-                f'Done. You are now chatting with {character_name}. To reset, enter /reset'
+                f'Done. You are now chatting with {character_name}. You can send text messages or voice notes. To reset, enter /reset'
             )
             bot.register_next_step_handler(sent_message, handle_message)
 
