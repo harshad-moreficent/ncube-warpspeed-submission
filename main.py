@@ -4,7 +4,10 @@ from pathlib import Path
 import pydantic
 import telebot
 from telebot.types import Message, BotCommand
+import os
 import requests
+import subprocess
+import tempfile
 from typing import Dict
 
 from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL, ENV_OPENAI_API_KEY, ENV_ELEVEN_LABS_API_KEY
@@ -25,7 +28,30 @@ def get_audio(bot: telebot.TeleBot, chat_id: str, file_id: str):
     if resp is None:
         log.error(f'{chat_id} - Failed to get resp')
 
-    return resp.content
+    content = resp.content
+    transc_content = None
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        oga_file_name = os.path.join(temp_dir, 'input.oga')
+        mp3_file_name = os.path.join(temp_dir, 'output.mp3')
+
+        with open(oga_file_name, "+wb") as oga_file:
+            oga_file.write(content)
+
+        subprocess.run(
+            ["ffmpeg", "-hide_banner", "-i", oga_file_name, mp3_file_name])
+        
+        with open(mp3_file_name, "br") as mp3_file:
+            transc_content = mp3_file.read()
+
+    # with tempfile.NamedTemporaryFile(
+    #         mode="w+b",
+    #         suffix='.oga') as oga_file, tempfile.NamedTemporaryFile(
+    #             mode="w+b", suffix='.mp3') as mp3_file:
+    #     print(oga_file.name)
+    #     print(mp3_file.name)
+
+    return transc_content
 
 
 def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
@@ -132,8 +158,6 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
 
 
 def main():
-    import os
-
     log_level = os.getenv(ENV_LOG_LEVEL)
     if log_level:
         logging.basicConfig(level=log_level)
