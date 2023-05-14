@@ -105,6 +105,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
 
         if content_type == 'text':
             if message.text in ['/reset', 'reset', '/start', 'start']:
+                del chat_data
                 start_handler(message)
             else:
                 log.info(f'{chat_id} - Got text input')
@@ -196,10 +197,7 @@ def run_bot(token: str, openai_api_key: str, eleven_labs_api_key: str,
 
     @bot.message_handler(commands=["reset"])
     def reset_handler(message: Message):
-        chat_id = message.chat.id
-        del state[chat_id]
-        sent_message = bot.reply_to(message, 'Done')
-        bot.register_next_step_handler(sent_message, chat_init_handler)
+        start_handler(message)
 
     log.info('Beginning bot polling')
     bot.infinity_polling()
