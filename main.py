@@ -1,74 +1,147 @@
-import json
+#!/usr/bin/env python
+# pylint: disable=unused-argument, wrong-import-position
+# This program is dedicated to the public domain under the CC0 license.
+
+"""
+First, a few callback functions are defined. Then, those functions are passed to
+the Application and registered at their respective places.
+Then, the bot is started and runs until we press Ctrl-C on the command line.
+
+Usage:
+Example of a bot-user conversation using ConversationHandler.
+Send /start to initiate the conversation.
+Press Ctrl-C on the command line or send a signal to the process to stop the
+bot.
+"""
+
 import logging
 from pathlib import Path
 import pydantic
-import telebot
-import requests
-from typing import List
+from typing import Dict
+
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
 
 from env_key import ENV_BOT_TOKEN, ENV_LOG_LEVEL
 from model import Character
 
 log = logging.getLogger(Path(__file__).stem)
 
+# Enable logging
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-def get_daily_horoscope(sign: str, day: str) -> dict:
-    """Get daily horoscope for a zodiac sign.
-    Keyword arguments:
-    sign:str - Zodiac sign
-    day:str - Date in format (YYYY-MM-DD) OR TODAY OR TOMORROW OR YESTERDAY
-    Return:dict - JSON data
-    """
-    url = "https://horoscope-app-api.vercel.app/api/v1/get-horoscope/daily"
-    params = {"sign": sign, "day": day}
-    response = requests.get(url, params)
-
-    return response.json()
+GENDER, PHOTO, LOCATION, BIO = range(4)
 
 
-def run_bot(token: str, characters: List[Character]):
-    bot = telebot.TeleBot(token)
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Starts the conversation and asks the user about their gender."""
+    reply_keyboard = [["Boy", "Girl", "Other"]]
 
-    def fetch_horoscope(message, sign):
-        day = message.text
-        horoscope = get_daily_horoscope(sign, day)
-        print(horoscope)
-        data = horoscope["data"]
-        horoscope_message = f'*Horoscope:* {data["horoscope_data"]}\\n*Sign:* {sign}\\n*Day:* {data["date"]}'
-        bot.send_message(message.chat.id, "Here's your horoscope!")
-        bot.send_message(message.chat.id,
-                         horoscope_message,
-                         parse_mode="Markdown")
+    await update.message.reply_text(
+        "Hi! My name is Professor Bot. I will hold a conversation with you. "
+        "Send /cancel to stop talking to me.\n\n"
+        "Are you a boy or a girl?",
+        reply_markup=ReplyKeyboardMarkup(
+            reply_keyboard, one_time_keyboard=True, input_field_placeholder="Boy or Girl?"
+        ),
+    )
 
-    def day_handler(message):
-        sign = message.text
-        text = "What day do you want to know?\nChoose one: *Today*, *Tomorrow*, *Yesterday*"
-        sent_message = bot.send_message(message.chat.id,
-                                        text,
-                                        parse_mode="Markdown")
-        bot.register_next_step_handler(sent_message, fetch_horoscope,
-                                       sign.capitalize())
-
-    @bot.message_handler(commands=["horoscope"])
-    def sign_handler(message):
-        text = "What is your zodiac sign?\nChoose one: *Aries*, *Taurus*"
-        sent_message = bot.send_message(message.chat.id,
-                                        text,
-                                        parse_mode="Markdown")
-        bot.register_next_step_handler(sent_message, day_handler)
-
-    @bot.message_handler(commands=["start"])
-    def start_handler(message):
-        bot.reply_to(
-            message,
-            "Hi, welcome to CelebVox. Please choose the celebrity you wish to chat with:"
-        )
-
-    log.info('Beginning bot polling')
-    bot.infinity_polling()
+    return GENDER
 
 
-def main():
+async def gender(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Stores the selected gender and asks for a photo."""
+    user = update.message.from_user
+    logger.info("Gender of %s: %s", user.first_name, update.message.text)
+    await update.message.reply_text(
+        "I see! Please send me a photo of yourself, "
+        "so I know what you look like, or send /skip if you don't want to.",
+        reply_markup=ReplyKeyboardRemove(),
+    )
+
+    return PHOTO
+
+
+async def photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Stores the photo and asks for a location."""
+    user = update.message.from_user
+    photo_file = await update.message.photo[-1].get_file()
+    await photo_file.download_to_drive("user_photo.jpg")
+    logger.info("Photo of %s: %s", user.first_name, "user_photo.jpg")
+    await update.message.reply_text(
+        "Gorgeous! Now, send me your location please, or send /skip if you don't want to."
+    )
+
+    return LOCATION
+
+
+async def skip_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Skips the photo and asks for a location."""
+    user = update.message.from_user
+    logger.info("User %s did not send a photo.", user.first_name)
+    await update.message.reply_text(
+        "I bet you look great! Now, send me your location please, or send /skip."
+    )
+
+    return LOCATION
+
+
+async def location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Stores the location and asks for some info about the user."""
+    user = update.message.from_user
+    user_location = update.message.location
+    logger.info(
+        "Location of %s: %f / %f", user.first_name, user_location.latitude, user_location.longitude
+    )
+    await update.message.reply_text(
+        "Maybe I can visit you sometime! At last, tell me something about yourself."
+    )
+
+    return BIO
+
+
+async def skip_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Skips the location and asks for info about the user."""
+    user = update.message.from_user
+    logger.info("User %s did not send a location.", user.first_name)
+    await update.message.reply_text(
+        "You seem a bit paranoid! At last, tell me something about yourself."
+    )
+
+    return BIO
+
+
+async def bio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Stores the info about the user and ends the conversation."""
+    user = update.message.from_user
+    logger.info("Bio of %s: %s", user.first_name, update.message.text)
+    await update.message.reply_text("Thank you! I hope we can talk again some day.")
+
+    return ConversationHandler.END
+
+
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Cancels and ends the conversation."""
+    user = update.message.from_user
+    logger.info("User %s canceled the conversation.", user.first_name)
+    await update.message.reply_text(
+        "Bye! I hope we can talk again some day.", reply_markup=ReplyKeyboardRemove()
+    )
+
+    return ConversationHandler.END
+
+
+def main() -> None:
     import os
 
     log_level = os.getenv(ENV_LOG_LEVEL)
@@ -82,7 +155,6 @@ def main():
             datefmt='%Y-%m-%d %H:%M:%S',
         )
 
-    log.info('Beginning BotHandlers')
 
     bot_token = os.getenv(ENV_BOT_TOKEN)
     if bot_token is None:
@@ -90,20 +162,36 @@ def main():
 
     characters = None
     try:
-        characters = pydantic.parse_file_as(List[Character], "characters.json")
+        characters = pydantic.parse_file_as(Dict[str, Character],
+                                            "characters.json")
     except pydantic.ValidationError as e:
         log.error(f'Failed to parse characters.json: {e.errors()}')
         return
-    
-    character_names = {character.name for character in characters}
-    if len(character_names) != len(characters):
-        log.error('Duplicate character names')
-        return
 
-    run_bot(bot_token, characters)
+    application = Application.builder().token(bot_token).build()
+    log.info('Built Application')
+
+    # Add conversation handler with the states GENDER, PHOTO, LOCATION and BIO
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            GENDER: [MessageHandler(filters.Regex("^(Boy|Girl|Other)$"), gender)],
+            PHOTO: [MessageHandler(filters.PHOTO, photo), CommandHandler("skip", skip_photo)],
+            LOCATION: [
+                MessageHandler(filters.LOCATION, location),
+                CommandHandler("skip", skip_location),
+            ],
+            BIO: [MessageHandler(filters.TEXT & ~filters.COMMAND, bio)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
+    application.add_handler(conv_handler)
+
+    # Run the bot until the user presses Ctrl-C
+    log.info('Initiating polling')
+    application.run_polling()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
-
-    print('ho gaya')
