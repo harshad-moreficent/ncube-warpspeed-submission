@@ -19,7 +19,7 @@ from model import Character, ChatData
 
 log = logging.getLogger(Path(__file__).stem)
 
-BOT_NAME = 'CelebVox'
+BOT_NAME = 'Baatein.ai'
 
 
 @retry(stop=(stop_after_delay(10) | stop_after_attempt(20)))
@@ -41,6 +41,7 @@ def get_audio_transcript(bot: telebot.TeleBot, chat_id: int, file_id: str):
         log.error(f'{chat_id}: Failed to get audio file info')
         return None
     audio_url = f'https://api.telegram.org/file/bot{bot.token}/{file_info.file_path}'
+    print(audio_url)
     resp = requests.get(audio_url, allow_redirects=True)
     if resp is None:
         log.error(f'{chat_id} - Failed to get resp')
